@@ -37,20 +37,37 @@ if os.path.exists(frontend_path):
 
 
 async def upload_file_to_fal(file_bytes: bytes, filename: str, content_type: str, fal_key: str) -> str:
+    """Upload file to fal.ai storage using the correct storage API"""
     async with httpx.AsyncClient(timeout=180) as client:
-        # Use fal storage upload API
-        resp = await client.post(
-            "https://rest.alpha.fal.ai/storage/upload",
-            headers={"Authorization": f"Key {fal_key}"},
-            files={"file": (filename, file_bytes, content_type)},
+        # Step 1: initiate upload - get presigned URL
+        init_resp = await client.post(
+            "https://storage.fal.ai/upload",
+            headers={
+                "Authorization": f"Key {fal_key}",
+                "Content-Type": "application/json",
+            },
+            json={"content_type": content_type, "file_name": filename},
         )
-        if resp.status_code not in (200, 201):
-            raise HTTPException(status_code=500, detail=f"File upload failed ({resp.status_code}): {resp.text[:300]}")
-        result = resp.json()
-        url = result.get("url") or result.get("file_url") or result.get("access_url")
-        if not url:
-            raise HTTPException(status_code=500, detail=f"No URL in upload response: {result}")
-        return url
+        if init_resp.status_code not in (200, 201):
+            raise HTTPException(status_code=500, detail=f"Upload init failed ({init_resp.status_code}): {init_resp.text[:300]}")
+        
+        init_data = init_resp.json()
+        upload_url = init_data.get("upload_url")
+        file_url = init_data.get("file_url")
+        
+        if not upload_url:
+            raise HTTPException(status_code=500, detail=f"No upload_url in response: {init_data}")
+        
+        # Step 2: PUT file to presigned URL
+        put_resp = await client.put(
+            upload_url,
+            content=file_bytes,
+            headers={"Content-Type": content_type},
+        )
+        if put_resp.status_code not in (200, 201, 204):
+            raise HTTPException(status_code=500, detail=f"File PUT failed ({put_resp.status_code}): {put_resp.text[:200]}")
+        
+        return file_url
 
 
 async def poll_fal_job(job_id: str, request_id: str):
