@@ -38,32 +38,19 @@ if os.path.exists(frontend_path):
 
 async def upload_file_to_fal(file_bytes: bytes, filename: str, content_type: str, fal_key: str) -> str:
     async with httpx.AsyncClient(timeout=180) as client:
-        try:
-            resp = await client.post(
-                "https://rest.alpha.fal.ai/storage/upload/initiate",
-                headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
-                json={"file_name": filename, "content_type": content_type},
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                upload_url = data.get("upload_url")
-                file_url = data.get("file_url")
-                if upload_url and file_url:
-                    put = await client.put(upload_url, content=file_bytes, headers={"Content-Type": content_type})
-                    if put.status_code in (200, 201, 204):
-                        return file_url
-        except Exception:
-            pass
-
-        resp2 = await client.post(
+        # Use fal storage upload API
+        resp = await client.post(
             "https://rest.alpha.fal.ai/storage/upload",
             headers={"Authorization": f"Key {fal_key}"},
             files={"file": (filename, file_bytes, content_type)},
         )
-        if resp2.status_code not in (200, 201):
-            raise HTTPException(status_code=500, detail=f"File upload failed: {resp2.text[:300]}")
-        result = resp2.json()
-        return result.get("url") or result.get("file_url") or result.get("access_url")
+        if resp.status_code not in (200, 201):
+            raise HTTPException(status_code=500, detail=f"File upload failed ({resp.status_code}): {resp.text[:300]}")
+        result = resp.json()
+        url = result.get("url") or result.get("file_url") or result.get("access_url")
+        if not url:
+            raise HTTPException(status_code=500, detail=f"No URL in upload response: {result}")
+        return url
 
 
 async def poll_fal_job(job_id: str, request_id: str):
@@ -78,7 +65,7 @@ async def poll_fal_job(job_id: str, request_id: str):
             elapsed += interval
             try:
                 sr = await client.get(
-                    f"{FAL_API_BASE}/{FAL_ENDPOINT}/requests/{request_id}/status",
+                    f"https://queue.fal.run/{FAL_ENDPOINT}/requests/{request_id}/status",
                     headers={"Authorization": f"Key {fal_key}"},
                     params={"logs": "1"},
                 )
@@ -97,7 +84,7 @@ async def poll_fal_job(job_id: str, request_id: str):
 
                 if status == "COMPLETED":
                     rr = await client.get(
-                        f"{FAL_API_BASE}/{FAL_ENDPOINT}/requests/{request_id}",
+                        f"https://queue.fal.run/{FAL_ENDPOINT}/requests/{request_id}",
                         headers={"Authorization": f"Key {fal_key}"},
                     )
                     result = rr.json()
@@ -169,7 +156,7 @@ async def animate(
 
     async with httpx.AsyncClient(timeout=60) as client:
         sub = await client.post(
-            f"{FAL_API_BASE}/{FAL_ENDPOINT}",
+            f"https://queue.fal.run/{FAL_ENDPOINT}",
             headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
             json=payload,
         )
