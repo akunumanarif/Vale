@@ -82,6 +82,9 @@ async def poll_fal_job(job_id: str, request_id: str):
                     headers={"Authorization": f"Key {fal_key}"},
                     params={"logs": "1"},
                 )
+                if sr.status_code != 200 or not sr.text.strip():
+                    jobs[job_id]["logs"] = jobs[job_id].get("logs", []) + [f"Waiting... (HTTP {sr.status_code})"]
+                    continue
                 sd = sr.json()
                 status = sd.get("status", "")
                 logs = [
