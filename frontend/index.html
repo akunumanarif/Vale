@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAN Animate — Character Motion Transfer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080b10;
+      --surface: #0d1117;
+      --surface2: #131920;
+      --border: #1e2d3d;
+      --accent: #00e5ff;
+      --accent2: #7c4dff;
+      --accent3: #ff6b35;
+      --text: #c9d8e8;
+      --text-dim: #5a7a94;
+      --success: #00e676;
+      --error: #ff5252;
+      --warn: #ffab40;
+      --glow: 0 0 20px rgba(0,229,255,0.15);
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Animated grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -40%;
+      left: -20%;
+      width: 80%;
+      height: 80%;
+      background: radial-gradient(ellipse, rgba(124,77,255,0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      margin-bottom: 3.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-mark {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #000;
+      letter-spacing: -0.05em;
+      flex-shrink: 0;
+    }
+
+    .header-text h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .header-text p {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+      margin-top: 2px;
+    }
+
+    .badge {
+      margin-left: auto;
+      background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.2);
+      color: var(--accent);
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    /* Config bar */
+    .config-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      flex-wrap: wrap;
+    }
+
+    .config-bar label {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+      white-space: nowrap;
+    }
+
+    .config-bar input[type="text"],
+    .config-bar select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.45rem 0.75rem;
+      border-radius: 7px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .config-bar input[type="text"]:focus,
+    .config-bar select:focus {
+      border-color: var(--accent);
+    }
+
+    #fal-key-input {
+      width: 280px;
+      letter-spacing: 0.04em;
+    }
+
+    .config-bar .sep {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+    }
+
+    /* Grid layout */
+    .input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    @media (max-width: 680px) {
+      .input-grid { grid-template-columns: 1fr; }
+      #fal-key-input { width: 100%; }
+    }
+
+    /* Upload panels */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .panel:hover {
+      border-color: rgba(0,229,255,0.25);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.9rem 1.1rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+    }
+
+    .panel-icon.img { background: rgba(0,229,255,0.12); }
+    .panel-icon.vid { background: rgba(255,107,53,0.12); }
+
+    .panel-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+
+    .panel-sub {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+      margin-left: auto;
+    }
+
+    .panel-body {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* Drop zone */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 1.75rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--accent);
+      background: rgba(0,229,255,0.04);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 1.8rem; opacity: 0.4; }
+    .drop-label { font-size: 0.78rem; color: var(--text-dim); font-family: 'Space Mono', monospace; }
+    .drop-hint { font-size: 0.65rem; color: var(--text-dim); opacity: 0.6; }
+
+    .preview-wrap {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .preview-wrap.visible { display: flex; }
+
+    .preview-wrap img, .preview-wrap video {
+      max-width: 100%;
+      max-height: 160px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+
+    .preview-name {
+      font-size: 0.65rem;
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .clear-btn {
+      font-size: 0.65rem;
+      color: var(--error);
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      background: none;
+      border: none;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    /* URL input */
+    .url-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .url-row span {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+      white-space: nowrap;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.4rem 0.65rem;
+      border-radius: 6px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .url-input:focus { border-color: var(--accent); }
+    .url-input::placeholder { color: var(--text-dim); opacity: 0.5; }
+
+    /* Settings row */
+    .settings-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .settings-row label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .settings-row select,
+    .settings-row input[type="range"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      outline: none;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 120px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      border: none !important;
+      padding: 0 !important;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .range-val {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 0.2s;
+    }
+
+    .submit-btn:hover::before { background: rgba(255,255,255,0.08); }
+    .submit-btn:active { transform: scale(0.99); }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .submit-btn .btn-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    /* Status panel */
+    #status-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+
+    #status-panel.visible { display: block; }
+
+    .status-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem 1.1rem;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .status-dot.queued { background: var(--warn); box-shadow: 0 0 8px var(--warn); animation: pulse 1.5s infinite; }
+    .status-dot.in_progress { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1s infinite; }
+    .status-dot.completed { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .status-dot.failed { background: var(--error); box-shadow: 0 0 8px var(--error); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .status-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+
+    .job-id-tag {
+      margin-left: auto;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+    }
+
+    .log-box {
+      padding: 0.75rem 1.1rem;
+      max-height: 140px;
+      overflow-y: auto;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .log-box::-webkit-scrollbar { width: 4px; }
+    .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .log-line { display: block; }
+    .log-line.new { color: var(--text); }
+
+    /* Result panel */
+    #result-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid rgba(0,230,118,0.25);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    #result-panel.visible { display: block; }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.9rem 1.1rem;
+      background: rgba(0,230,118,0.06);
+      border-bottom: 1px solid rgba(0,230,118,0.15);
+    }
+
+    .result-header span { font-size: 1rem; }
+    .result-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--success);
+    }
+
+    .result-body {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    #result-video {
+      width: 100%;
+      max-height: 400px;
+      border-radius: 10px;
+      background: #000;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+
+    .action-btn.primary {
+      background: var(--success);
+      color: #000;
+      border: none;
+    }
+
+    .action-btn.secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .action-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* Error panel */
+    #error-panel {
+      display: none;
+      background: rgba(255,82,82,0.07);
+      border: 1px solid rgba(255,82,82,0.25);
+      border-radius: 10px;
+      padding: 0.9rem 1.1rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--error);
+    }
+
+    #error-panel.visible { display: block; }
+
+    /* Job history */
+    .history-section {
+      margin-top: 2.5rem;
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 0.75rem;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.65rem 0.9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.68rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .history-item:hover { border-color: var(--accent); }
+    .history-item .h-id { color: var(--accent); font-weight: 700; }
+    .history-item .h-status { margin-left: auto; }
+    .history-item .h-time { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo-mark">WAN</div>
+    <div class="header-text">
+      <h1>Wan 2.2 Animate Move</h1>
+      <p>fal-ai/wan/v2.2-14b/animate/move — Character Motion Transfer</p>
+    </div>
+    <div class="badge">v2.2 · 14B</div>
+  </header>
+
+  <!-- Config bar -->
+  <div class="config-bar">
+    <label for="fal-key-input">FAL API KEY</label>
+    <input id="fal-key-input" type="text" placeholder="fal_••••••••••••••••••••" autocomplete="off" />
+    <div class="sep"></div>
+    <label>RESOLUTION</label>
+    <select id="res-select">
+      <option value="720p">720p</option>
+      <option value="480p">480p</option>
+      <option value="580p">580p</option>
+    </select>
+    <div class="sep"></div>
+    <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+      STEPS
+      <input type="range" id="steps-range" min="10" max="50" value="30">
+      <span class="range-val" id="steps-val">30</span>
+    </label>
+  </div>
+
+  <!-- Input panels -->
+  <div class="input-grid">
+    <!-- Image panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon img">🖼️</div>
+        <span class="panel-title">Character Image</span>
+        <span class="panel-sub">PNG / JPG / WEBP</span>
+      </div>
+      <div class="panel-body">
+        <div class="dropzone" id="img-drop">
+          <input type="file" id="img-file" accept="image/*">
+          <div class="drop-icon">⬆</div>
+          <div class="drop-label">Drop image or click to browse</div>
+          <div class="drop-hint">The character to be animated</div>
+        </div>
+        <div class="preview-wrap" id="img-preview">
+          <img id="img-preview-el" src="" alt="Preview">
+          <span class="preview-name" id="img-name"></span>
+          <button class="clear-btn" onclick="clearInput('img')">✕ remove</button>
+        </div>
+        <div class="url-row">
+          <span>or URL →</span>
+          <input class="url-input" id="img-url" type="text" placeholder="https://...jpg">
+        </div>
+      </div>
+    </div>
+
+    <!-- Video panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon vid">🎬</div>
+        <span class="panel-title">Drive Video</span>
+        <span class="panel-sub">MP4 / WEBM</span>
+      </div>
+      <div class="panel-body">
+        <div class="dropzone" id="vid-drop">
+          <input type="file" id="vid-file" accept="video/*">
+          <div class="drop-icon">⬆</div>
+          <div class="drop-label">Drop video or click to browse</div>
+          <div class="drop-hint">The motion reference video</div>
+        </div>
+        <div class="preview-wrap" id="vid-preview">
+          <video id="vid-preview-el" controls muted></video>
+          <span class="preview-name" id="vid-name"></span>
+          <button class="clear-btn" onclick="clearInput('vid')">✕ remove</button>
+        </div>
+        <div class="url-row">
+          <span>or URL →</span>
+          <input class="url-input" id="vid-url" type="text" placeholder="https://...mp4">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <button class="submit-btn" id="submit-btn" onclick="submitJob()">
+    <div class="btn-inner">
+      <span>▶</span>
+      <span>Generate Animated Video</span>
+    </div>
+  </button>
+
+  <!-- Status -->
+  <div id="status-panel">
+    <div class="status-header">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-label" id="status-label">Processing...</span>
+      <span class="job-id-tag" id="job-id-tag"></span>
+    </div>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-panel"></div>
+
+  <!-- Result -->
+  <div id="result-panel">
+    <div class="result-header">
+      <span>✓</span>
+      <span class="result-title">Generation Complete</span>
+    </div>
+    <div class="result-body">
+      <video id="result-video" controls autoplay loop></video>
+      <div class="result-actions">
+        <a id="download-btn" class="action-btn primary" href="#" download="wan-animate-output.mp4">↓ Download Video</a>
+        <button class="action-btn secondary" onclick="resetUI()">↺ New Generation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history-section" id="history-section" style="display:none;">
+    <div class="section-title">// Recent Jobs</div>
+    <div class="history-list" id="history-list"></div>
+  </div>
+</div>
+
+<script>
+  const API = window.location.origin;
+  let pollInterval = null;
+  let currentJobId = null;
+  let history = JSON.parse(localStorage.getItem('wan_jobs') || '[]');
+
+  // Persist FAL key in sessionStorage
+  const savedKey = sessionStorage.getItem('fal_key');
+  if (savedKey) document.getElementById('fal-key-input').value = savedKey;
+  document.getElementById('fal-key-input').addEventListener('input', e => {
+    sessionStorage.setItem('fal_key', e.target.value);
+  });
+
+  // Steps slider
+  const stepsRange = document.getElementById('steps-range');
+  const stepsVal = document.getElementById('steps-val');
+  stepsRange.addEventListener('input', () => stepsVal.textContent = stepsRange.value);
+
+  // File previews
+  document.getElementById('img-file').addEventListener('change', e => handleFile(e, 'img'));
+  document.getElementById('vid-file').addEventListener('change', e => handleFile(e, 'vid'));
+
+  // Drag-over styles
+  ['img-drop','vid-drop'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+      e.preventDefault(); el.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const type = id === 'img-drop' ? 'img' : 'vid';
+      simulateFileInput(file, type);
+    });
+  });
+
+  function handleFile(e, type) {
+    const file = e.target.files[0];
+    if (!file) return;
+    showPreview(file, type);
+  }
+
+  function simulateFileInput(file, type) {
+    const input = document.getElementById(`${type}-file`);
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    showPreview(file, type);
+  }
+
+  function showPreview(file, type) {
+    const url = URL.createObjectURL(file);
+    if (type === 'img') {
+      document.getElementById('img-preview-el').src = url;
+      document.getElementById('img-name').textContent = file.name;
+      document.getElementById('img-drop').style.display = 'none';
+      document.getElementById('img-preview').classList.add('visible');
+      document.getElementById('img-url').value = '';
+    } else {
+      document.getElementById('vid-preview-el').src = url;
+      document.getElementById('vid-name').textContent = file.name;
+      document.getElementById('vid-drop').style.display = 'none';
+      document.getElementById('vid-preview').classList.add('visible');
+      document.getElementById('vid-url').value = '';
+    }
+  }
+
+  function clearInput(type) {
+    const input = document.getElementById(`${type}-file`);
+    input.value = '';
+    if (type === 'img') {
+      document.getElementById('img-drop').style.display = 'flex';
+      document.getElementById('img-preview').classList.remove('visible');
+    } else {
+      document.getElementById('vid-drop').style.display = 'flex';
+      document.getElementById('vid-preview').classList.remove('visible');
+    }
+  }
+
+  async function submitJob() {
+    hideError();
+    const falKey = document.getElementById('fal-key-input').value.trim();
+    if (!falKey) { showError('Please enter your FAL API Key above'); return; }
+
+    const imgFile = document.getElementById('img-file').files[0];
+    const vidFile = document.getElementById('vid-file').files[0];
+    const imgUrl = document.getElementById('img-url').value.trim();
+    const vidUrl = document.getElementById('vid-url').value.trim();
+    const resolution = document.getElementById('res-select').value;
+    const steps = parseInt(stepsRange.value);
+
+    if (!imgFile && !imgUrl) { showError('Character image is required (file or URL)'); return; }
+    if (!vidFile && !vidUrl) { showError('Drive video is required (file or URL)'); return; }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.querySelector('.btn-inner').innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">◌</span><span>Uploading & Submitting…</span>';
+
+    const fd = new FormData();
+    if (imgFile) fd.append('image_file', imgFile);
+    else fd.append('image_url', imgUrl);
+    if (vidFile) fd.append('video_file', vidFile);
+    else fd.append('video_url', vidUrl);
+    fd.append('resolution', resolution);
+    fd.append('num_inference_steps', steps);
+
+    // Pass FAL key as header via a proxy approach — 
+    // We store it in header via custom approach
+    try {
+      const resp = await fetch(`${API}/api/animate`, {
+        method: 'POST',
+        headers: { 'X-Fal-Key': falKey },
+        body: fd,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || 'Submit failed');
+
+      currentJobId = data.job_id;
+      showStatus('queued', currentJobId);
+      addToHistory(currentJobId);
+      startPolling(currentJobId);
+
+    } catch (err) {
+      showError(err.message);
+      resetBtn();
+    }
+  }
+
+  function startPolling(jobId) {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(async () => {
+      try {
+        const resp = await fetch(`${API}/api/jobs/${jobId}`);
+        const job = await resp.json();
+        updateStatus(job);
+        if (job.status === 'completed' || job.status === 'failed') {
+          clearInterval(pollInterval);
+          pollInterval = null;
+          resetBtn();
+          if (job.status === 'completed') showResult(job.result_url);
+          else showError(job.error || 'Job failed');
+          updateHistory(jobId, job.status);
+        }
+      } catch(e) {
+        console.error('Poll error:', e);
+      }
+    }, 3000);
+  }
+
+  function showStatus(status, jobId) {
+    const panel = document.getElementById('status-panel');
+    panel.classList.add('visible');
+    document.getElementById('status-dot').className = `status-dot ${status}`;
+    document.getElementById('status-label').textContent = status === 'queued' ? 'In Queue...' :
+      status === 'in_progress' ? 'Generating...' :
+      status === 'completed' ? 'Complete ✓' : 'Failed';
+    document.getElementById('job-id-tag').textContent = `JOB: ${jobId}`;
+    document.getElementById('result-panel').classList.remove('visible');
+  }
+
+  function updateStatus(job) {
+    showStatus(job.status, job.job_id);
+    const logBox = document.getElementById('log-box');
+    if (job.logs && job.logs.length) {
+      logBox.innerHTML = job.logs.map((l, i) =>
+        `<span class="log-line ${i === job.logs.length-1 ? 'new' : ''}">> ${escHtml(l)}</span>`
+      ).join('\n');
+      logBox.scrollTop = logBox.scrollHeight;
+    } else {
+      logBox.innerHTML = `<span class="log-line">> Status: ${job.raw_status || job.status}…</span>`;
+    }
+  }
+
+  function showResult(url) {
+    if (!url) { showError('Generation complete but no video URL returned'); return; }
+    const panel = document.getElementById('result-panel');
+    panel.classList.add('visible');
+    const video = document.getElementById('result-video');
+    video.src = url;
+    const dlBtn = document.getElementById('download-btn');
+    dlBtn.href = url;
+    dlBtn.setAttribute('download', 'wan-animate-output.mp4');
+    video.play().catch(() => {});
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-panel');
+    el.textContent = '⚠ ' + msg;
+    el.classList.add('visible');
+  }
+
+  function hideError() {
+    document.getElementById('error-panel').classList.remove('visible');
+  }
+
+  function resetBtn() {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = false;
+    btn.querySelector('.btn-inner').innerHTML = '<span>▶</span><span>Generate Animated Video</span>';
+  }
+
+  function resetUI() {
+    document.getElementById('result-panel').classList.remove('visible');
+    document.getElementById('status-panel').classList.remove('visible');
+    hideError();
+    currentJobId = null;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // History
+  function addToHistory(jobId) {
+    history.unshift({ jobId, status: 'queued', ts: Date.now() });
+    if (history.length > 20) history = history.slice(0, 20);
+    saveHistory(); renderHistory();
+  }
+
+  function updateHistory(jobId, status) {
+    const item = history.find(h => h.jobId === jobId);
+    if (item) { item.status = status; saveHistory(); renderHistory(); }
+  }
+
+  function saveHistory() { localStorage.setItem('wan_jobs', JSON.stringify(history)); }
+
+  function renderHistory() {
+    if (!history.length) return;
+    document.getElementById('history-section').style.display = 'block';
+    const list = document.getElementById('history-list');
+    list.innerHTML = history.slice(0, 8).map(h => `
+      <div class="history-item" onclick="loadJob('${h.jobId}')">
+        <span class="h-id">${h.jobId}</span>
+        <span class="h-time">${new Date(h.ts).toLocaleTimeString()}</span>
+        <span class="h-status" style="color:${
+          h.status==='completed'?'var(--success)':
+          h.status==='failed'?'var(--error)':
+          h.status==='in_progress'?'var(--accent)':'var(--warn)'}">${h.status}</span>
+      </div>`).join('');
+  }
+
+  async function loadJob(jobId) {
+    try {
+      const resp = await fetch(`${API}/api/jobs/${jobId}`);
+      if (!resp.ok) return;
+      const job = await resp.json();
+      updateStatus(job);
+      if (job.status === 'completed' && job.result_url) showResult(job.result_url);
+      else if (job.status === 'in_progress' || job.status === 'queued') {
+        currentJobId = jobId;
+        startPolling(jobId);
+      }
+    } catch(e) {}
+  }
+
+  renderHistory();
+
+  // Spin animation
+  const style = document.createElement('style');
+  style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+  document.head.appendChild(style);
+</script>
+</body>
+</html>
