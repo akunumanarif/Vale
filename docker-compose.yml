@@ -5,9 +5,6 @@ services:
     build: .
     container_name: wan-animate
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    network_mode: host
     environment:
-      - FAL_KEY=${FAL_KEY:-}   # optional: set as fallback if not entered in UI
-    volumes:
-      - ./uploads:/app/uploads  # optional temp storage
+      - FAL_KEY=${FAL_KEY:-}
